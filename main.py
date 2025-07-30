@@ -1,14 +1,13 @@
 import os
-from typing import List, Annotated, Optional
+from typing import List, Annotated
 from sqlalchemy.orm import Session
-from web.model_news import Role as RoleModel, User as UserModel, RoleEnum, NewsStatusEnum, WebNews, TagEnum
-from web.schemes import Role, User, UserCreate, Token, News, NewsCreate, NewsUpdate
+from web.model_news import Role as RoleModel, User as UserModel, RoleEnum
+from web.schemes import Role
 from web.database import get_db, Base, engine, SessionLocal
-from web.Guard import create_access_token, get_current_user, role_required
+from web.Guard import create_access_token
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
-from datetime import datetime, timezone
 from dotenv import load_dotenv
 from contextlib import asynccontextmanager
 from web.routers.users import router as user_router
@@ -103,7 +102,7 @@ async def login_for_access_token(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
     db: Session = Depends(get_db)
 ):
-    user = get_user_by_login(db, form_data.username) # Используем form_data.username
+    user = get_user_by_login(db, form_data.username)
 
     if not user or user.password != form_data.password:
         raise HTTPException(

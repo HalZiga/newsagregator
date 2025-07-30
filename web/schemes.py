@@ -65,6 +65,7 @@ class TokenData(BaseModel):
 class NewsBase(BaseModel):
     title: str = Field(..., min_length=3, max_length=255)
     body: str = Field(..., min_length=10)
+    status: NewsStatusEnum
 
 class NewsCreate(NewsBase):
     pass
@@ -80,9 +81,9 @@ class News(NewsBase):
     created_at: datetime
     updated_at: Optional[datetime] = None
     URL: Optional[str] = None
-    author: Optional[str] = None  # Это строковое имя автора
+    author: Optional[str] = None
     status: NewsStatusEnum
-    tags: list[str] = Field(default_factory=list)
+    tags: set[str] = Field(default_factory=set)
     category: Optional[TagEnum] = None
     views: int = 0
 

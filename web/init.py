@@ -3,8 +3,6 @@ from web.model_news import Role, RoleEnum
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-# Base.metadata.create_all(bind=engine)
-
 def create_initial_roles():
     session: Session = SessionLocal()
     try:

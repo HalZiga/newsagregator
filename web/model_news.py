@@ -3,7 +3,7 @@ from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Enum, F
 from sqlalchemy.dialects import postgresql
 from web.database import Base
 from sqlalchemy.orm import relationship
-from datetime import datetime
+from datetime import datetime, timezone
 
 class TagEnum(enum.Enum):
     Live = "Live"
@@ -12,7 +12,7 @@ class TagEnum(enum.Enum):
     POLITICS = "Politics"
     SPORT = "Sport"
 
-class RoleEnum(enum.Enum):# 'admin', 'moderator', 'reader'
+class RoleEnum(enum.Enum):
     Admin = "admin"
     Moderator = "moderator"
     Reader = "reader"
@@ -39,7 +39,10 @@ class User(Base):
     email = Column(String(100), unique=True, nullable=False)
     password = Column(String(255), nullable=False)
     in_ban = Column(Boolean, default=False)
-    created = Column(DateTime, default=datetime.utcnow)
+    created = Column(DateTime, default=datetime.now(timezone.utc))
+    updated = Column(DateTime)
+    ban_at = Column(DateTime)
+
 
     roles = relationship("Role", secondary=user_roles, back_populates="users")
 

@@ -1,15 +1,12 @@
 from typing import List
 from sqlalchemy.orm import Session
-from web.model_news import Role as RoleModel, User as UserModel, RoleEnum, NewsStatusEnum, WebNews, TagEnum
+from web.model_news import Role as RoleModel, User as UserModel
 from web.schemes import User, UserCreate, UserForModerator, UserUpdate
 from web.database import get_db
-from web.Guard import create_access_token, get_current_user, role_required
+from web.Guard import role_required
 from fastapi import Depends, HTTPException, APIRouter, status
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime, timezone
 from dotenv import load_dotenv
-from contextlib import asynccontextmanager
 
 load_dotenv()
 
@@ -115,3 +112,36 @@ async def delete_user(
     db.delete(user)
     db.commit()
     return {}
+
+@router.patch("/{user_id}/ban_status", response_model=User)
+async def update_user_ban_status(
+    user_id: int,
+    in_ban: bool,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(role_required(["admin"]))
+):
+    """
+    Заблокировать или разблокировать пользователя по ID.
+    Доступно только для администраторов.
+    """
+    user_to_update = db.query(UserModel).filter(UserModel.id == user_id).first()
+    if not user_to_update:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Пользователь не найден")
+
+    if user_to_update.id == current_user.id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="Вы не можете изменить статус блокировки для самого себя через этот метод.")
+
+    if user_to_update.in_ban == in_ban:
+        return user_to_update
+
+    user_to_update.in_ban = in_ban
+    user_to_update.updated = datetime.now(timezone.utc)
+    if hasattr(user_to_update, 'ban_at'):
+        user_to_update.ban_at = datetime.now(timezone.utc)
+
+    db.add(user_to_update)
+    db.commit()
+    db.refresh(user_to_update)
+
+    return user_to_update
