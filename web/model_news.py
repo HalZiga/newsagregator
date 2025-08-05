@@ -28,7 +28,7 @@ user_roles = Table(
     Column('user_id', Integer, ForeignKey('users.id'), primary_key=True),
     Column('role_id', Integer, ForeignKey('roles.id'), primary_key=True)
 )
-
+#------------------------- мб Mapped использовать
 class User(Base):
     __tablename__ = 'users'
 
@@ -45,6 +45,7 @@ class User(Base):
 
 
     roles = relationship("Role", secondary=user_roles, back_populates="users")
+    created_news_items = relationship("WebNews", back_populates="created_by")
 
 class WebNews(Base):
     __tablename__ = "news"
@@ -53,7 +54,6 @@ class WebNews(Base):
     title = Column(String, nullable=False)
     body = Column(Text, nullable=False)
     URL = Column(String, unique=True)
-    author = Column(String)
     created_by_user_id = Column(Integer, ForeignKey('users.id'))
     status = Column(Enum(NewsStatusEnum), default=NewsStatusEnum.Draft, nullable=False, index=True)
     created_at = Column(DateTime)
@@ -63,8 +63,7 @@ class WebNews(Base):
     category = Column(Enum(TagEnum), nullable=False, default=TagEnum.Live) #
     views = Column(Integer, default=0)
 
-    created_by = relationship("User", foreign_keys=[created_by_user_id], backref="created_news_items",
-                              remote_side=[User.id])
+    created_by = relationship("User", foreign_keys=[created_by_user_id], back_populates="created_news_items")
 
 class Role(Base):
     __tablename__ = 'roles'

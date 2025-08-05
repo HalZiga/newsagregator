@@ -8,6 +8,7 @@ from web.database import get_db, Base
 from web.model_news import User
 from web.schemes import TokenData
 import os
+from passlib.context import CryptContext
 
 load_dotenv()
 
@@ -20,9 +21,18 @@ load_dotenv()
 #     class Config:
 #         from_attributes = True # если часто надо будет декодировать токен надо будет сделать класс где буде хранить все
 
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
+
+# Функция для хеширования пароля
+def hash_password(password: str) -> str:
+    return pwd_context.hash(password)
+
+# Функция для проверки пароля
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
 
 def create_access_token(data: dict):
     to_encode = data.copy()
@@ -74,3 +84,4 @@ def role_required(required_roles: List[str]):
             )
         return current_user
     return role_checker
+

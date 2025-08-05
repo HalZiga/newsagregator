@@ -1,7 +1,7 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, computed_field
 from typing import Optional, Annotated
 from datetime import datetime
-from web.model_news import RoleEnum, NewsStatusEnum, TagEnum
+from web.model_news import RoleEnum, TagEnum, NewsStatusEnum
 
 class Role(BaseModel):
     name: RoleEnum
@@ -13,7 +13,7 @@ class UserBase(BaseModel):
     login: str
     FIO: Optional[str] = None
     phone: Optional[str] = None
-    email: EmailStr
+    email: Optional[EmailStr] = None
     in_ban: Optional[bool] = False
 
     class Config:
@@ -28,6 +28,13 @@ class User(UserBase):
     created: datetime
     roles: Annotated[list[Role], Field(default_factory=list)]
 
+class UserForNews(BaseModel):
+    login: str
+    roles: list[Role]
+
+    class Config:
+        from_attributes = True
+
 class UserLogin(BaseModel):
     login: str
     password: str
@@ -35,7 +42,6 @@ class UserLogin(BaseModel):
 class UserForModerator(BaseModel):
     id: int
     login: str
-    FIO: str
     in_ban: bool
     created: datetime
     roles: list[Role]
@@ -65,7 +71,6 @@ class TokenData(BaseModel):
 class NewsBase(BaseModel):
     title: str = Field(..., min_length=3, max_length=255)
     body: str = Field(..., min_length=10)
-    status: NewsStatusEnum
 
 class NewsCreate(NewsBase):
     pass
@@ -77,15 +82,32 @@ class NewsUpdate(NewsBase):
 
 class News(NewsBase):
     id: int
+    status: NewsStatusEnum
     created_by_user_id: int
     created_at: datetime
     updated_at: Optional[datetime] = None
+    published_at: Optional[datetime] = None
     URL: Optional[str] = None
-    author: Optional[str] = None
-    status: NewsStatusEnum
     tags: set[str] = Field(default_factory=set)
     category: Optional[TagEnum] = None
     views: int = 0
+    created_by: Optional[UserForNews] = None #да я знаю что это лишнее раз ест author, но self.created_by иначе не работает
+    # не могу заставить чтобы питон увидел связи и при вызове author понял все, если найду как - исправлю
+
+    @computed_field
+    @property
+    def author(self) -> Optional[str]:
+        if self.created_by and self.created_by.login:
+            return self.created_by.login
+        return "Неизвестен"
+
+
+    class Config:
+        from_attributes = True
+        extra = 'allow'
+
+class NewsWithPermission(News):
+    can_publish: bool
 
     class Config:
         from_attributes = True

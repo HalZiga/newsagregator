@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from web.model_news import Role as RoleModel, User as UserModel
 from web.schemes import User, UserCreate, UserForModerator, UserUpdate
 from web.database import get_db
-from web.Guard import role_required
+from web.Guard import role_required, hash_password
 from fastapi import Depends, HTTPException, APIRouter, status
 from datetime import datetime, timezone
 from dotenv import load_dotenv
@@ -20,6 +20,8 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
 
     roles = db.query(RoleModel).filter(RoleModel.id.in_(user.role_ids)).all()
 
+    hashed_password = hash_password(user.password)
+
     user_obj = UserModel(
         login=user.login,
         FIO=user.FIO,
@@ -28,7 +30,7 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
         in_ban=user.in_ban,
         created=datetime.now(timezone.utc),
         roles=roles,
-        password = user.password
+        password = hashed_password
     )
 
     db.add(user_obj)
@@ -61,6 +63,7 @@ def update_user(user_id: int, user_update: UserUpdate,db: Session = Depends(get_
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
                         detail="Вы не зашли в систему")
     user_to_update = db.query(UserModel).filter(UserModel.id == user_id).first()
+
     if not user_to_update:
         raise HTTPException(status_code=404, detail="Пользователь не найден")
 
@@ -87,7 +90,9 @@ def update_user(user_id: int, user_update: UserUpdate,db: Session = Depends(get_
         user_to_update.roles = new_roles
         del update_data["role_ids"]
 
-    print("Тут все")
+    for key, value in update_data.items():
+        setattr(user_to_update, key, value)
+
     db.add(user_to_update)
     db.commit()
     db.refresh(user_to_update)
