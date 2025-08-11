@@ -4,6 +4,7 @@ from datetime import datetime
 from web.model_news import RoleEnum, TagEnum, NewsStatusEnum
 
 class Role(BaseModel):
+    id: int
     name: RoleEnum
 
     class Config:
@@ -14,19 +15,18 @@ class UserBase(BaseModel):
     FIO: Optional[str] = None
     phone: Optional[str] = None
     email: Optional[EmailStr] = None
-    in_ban: Optional[bool] = False
+    in_ban: bool = False
 
     class Config:
         from_attributes = True
 
 class UserCreate(UserBase):
     password: str
-    role_ids: Annotated[list[int], Field(default_factory=list)]
 
 class User(UserBase):
     id: int
     created: datetime
-    roles: Annotated[list[Role], Field(default_factory=list)]
+    roles: Annotated[list[Role], Field(default_factory=list)] = None
 
 class UserForNews(BaseModel):
     login: str
@@ -54,8 +54,8 @@ class UserUpdate(BaseModel):
     FIO: Optional[str] = None
     phone: Optional[str] = None
     email: Optional[str] = None
-    in_ban: Optional[bool] = False
-    role_ids: Annotated[list[int], Field(default_factory=list)] = None
+    in_ban: Optional[bool] = None
+    role_ids: Optional[list[int]] = None
 
     class Config:
         from_attributes = True
@@ -64,13 +64,17 @@ class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
 
+
 class TokenData(BaseModel):
     username: Optional[str] = None
+    id: int
     roles: list[str] = []
 
 class NewsBase(BaseModel):
     title: str = Field(..., min_length=3, max_length=255)
     body: str = Field(..., min_length=10)
+    tags: list[str] = Field(default_factory=list)
+    category: Optional[TagEnum] = None
 
 class NewsCreate(NewsBase):
     pass
@@ -88,8 +92,6 @@ class News(NewsBase):
     updated_at: Optional[datetime] = None
     published_at: Optional[datetime] = None
     URL: Optional[str] = None
-    tags: set[str] = Field(default_factory=set)
-    category: Optional[TagEnum] = None
     views: int = 0
     created_by: Optional[UserForNews] = None #да я знаю что это лишнее раз ест author, но self.created_by иначе не работает
     # не могу заставить чтобы питон увидел связи и при вызове author понял все, если найду как - исправлю
@@ -108,6 +110,7 @@ class News(NewsBase):
 
 class NewsWithPermission(News):
     can_publish: bool
+    can_delete_update: bool
 
     class Config:
         from_attributes = True

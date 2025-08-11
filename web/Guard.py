@@ -62,7 +62,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
         username: str = payload.get("sub")
         if username is None:
             raise None
-        token_data = TokenData(username=username, roles=payload.get("roles", []))
+        token_data = TokenData(username=username, roles=payload.get("roles", []), id=payload.get("id"))
     except JWTError:
         return None
     user = db.query(User).filter(User.login == username).first()

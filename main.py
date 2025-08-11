@@ -68,10 +68,10 @@ async def lifespan(app: FastAPI):
 
     yield
     print("Завершаем приложение")
-
 app = FastAPI(lifespan=lifespan)
 app.include_router(user_router)
 app.include_router(news_router)
+
 
 origins = [
     "http://localhost",
@@ -117,6 +117,6 @@ async def login_for_access_token(
         )
 
     access_token = create_access_token(
-        data={"sub": user.login, "roles": [role.name.value for role in user.roles]},
+        data={"sub": user.login, "id": user.id, "roles": [role.name.value for role in user.roles]},
     )
     return {"access_token": access_token, "token_type": "bearer"}

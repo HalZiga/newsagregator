@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session, joinedload
-from web.model_news import User as UserModel, NewsStatusEnum, WebNews, TagEnum, RoleEnum
+from web.model_news import User as UserModel, NewsStatusEnum, WebNews, TagEnum, RoleEnum, Role
 from web.database import get_db
 from web.schemes import News, NewsCreate, NewsUpdate, NewsWithPermission
 from web.Guard import get_current_user, role_required
@@ -13,6 +13,12 @@ load_dotenv()
 
 router = APIRouter(prefix="/news", tags=["news"])
 
+@router.get("/categories", response_model=list[str])
+async def get_available_categories():
+    """
+    Возвращает список всех доступных категорий новостей.
+    """
+    return [tag.value for tag in TagEnum]
 
 @router.post("/", response_model=News, status_code=status.HTTP_201_CREATED)
 async def create_news(
@@ -21,6 +27,7 @@ async def create_news(
         current_user: UserModel = Depends(role_required(["admin", "moderator", "author", "reader"]))
 ):
     news_status = NewsStatusEnum.Draft
+    author_role = db.query(Role).filter(Role.name == RoleEnum.Author).first()
 
     new_news = WebNews(
         title=news_data.title,
@@ -28,10 +35,14 @@ async def create_news(
         status=news_status,
         created_by_user_id=current_user.id,
         created_at=datetime.now(timezone.utc),
-        tags=["First", "admin"],
-        category=TagEnum.SCIENCE
+        tags=news_data.tags,
+        category=news_data.category
     )
     db.add(new_news)
+
+    user_has_author_role = any(role.name == 'author' for role in current_user.roles)
+    if not user_has_author_role:
+        current_user.roles.append(author_role)
     db.commit()
     db.refresh(new_news)
 
@@ -76,7 +87,6 @@ async def get_all_news_authorized(
 
     return news_list
 
-
 @router.get("/{news_id}", response_model=NewsWithPermission)
 async def get_news_by_id(
         news_id: int,
@@ -106,6 +116,10 @@ async def get_news_by_id(
     is_draft = news.status == NewsStatusEnum.Draft
     can_publish_value = is_moderator and is_draft
 
+    is_admin = RoleEnum.Admin.value in user_roles
+    is_author_of_this_news = current_user is not None and current_user.id == news.created_by_user_id
+    can_delete_update_value = is_moderator or is_admin or is_author_of_this_news
+
     news_data = {
         "id": news.id,
         "title": news.title,
@@ -119,6 +133,7 @@ async def get_news_by_id(
         "views": news.views,
         "created_by": news.created_by,
         "can_publish": can_publish_value,
+        "can_delete_update": can_delete_update_value,
     }
 
     return NewsWithPermission.model_validate(news_data)
@@ -230,3 +245,4 @@ async def delete_news(
     db.delete(news)
     db.commit()
     return {}
+

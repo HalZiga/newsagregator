@@ -1,6 +1,6 @@
 from typing import List
 from sqlalchemy.orm import Session
-from web.model_news import Role as RoleModel, User as UserModel
+from web.model_news import Role as RoleModel, User as UserModel, RoleEnum
 from web.schemes import User, UserCreate, UserForModerator, UserUpdate
 from web.database import get_db
 from web.Guard import role_required, hash_password
@@ -14,11 +14,11 @@ router = APIRouter(prefix="/users", tags=["users"])
 
 @router.post("/", response_model=User)
 def create_user(user: UserCreate, db: Session = Depends(get_db)):
+    reader_role = db.query(RoleModel).filter(RoleModel.name == RoleEnum.Reader).first()
     existing_user = db.query(UserModel).filter(UserModel.login == user.login).first()
     if existing_user:
         raise HTTPException(status_code=400, detail="Login already taken")
 
-    roles = db.query(RoleModel).filter(RoleModel.id.in_(user.role_ids)).all()
 
     hashed_password = hash_password(user.password)
 
@@ -29,7 +29,7 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
         email=user.email,
         in_ban=user.in_ban,
         created=datetime.now(timezone.utc),
-        roles=roles,
+        roles=[reader_role],
         password = hashed_password
     )
 
@@ -56,9 +56,26 @@ def get_users(db: Session = Depends(get_db), current_user: UserModel = Depends(r
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
                             detail="Недостаточно прав для просмотра списка пользователей")
 
+@router.get("/{user_id}", response_model=User)
+def get_user_by_id(user_id: int, db: Session = Depends(get_db), current_user: UserModel = Depends(role_required(["admin", "moderator", "author", "reader"]))):
+    if current_user == None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Вы не зашли в систему")
+    user_roles = [role.name.value for role in current_user.roles]
+
+    user_to_update = db.query(UserModel).filter(UserModel.id == user_id).first()
+
+    if "admin" in user_roles or current_user.id == user_id:
+        return user_to_update
+    elif "moderator" in user_roles:
+        return [UserForModerator.model_validate(user_to_update)]
+    else:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                            detail="Недостаточно прав для просмотра списка пользователей")
+
 @router.patch("/{user_id}", response_model=User)
 def update_user(user_id: int, user_update: UserUpdate,db: Session = Depends(get_db),
-                Current_user: UserModel = Depends(role_required(["admin", "moderator", "author"]))):
+                Current_user: UserModel = Depends(role_required(["admin", "moderator", "author", "reader"]))):
     if Current_user == None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
                         detail="Вы не зашли в систему")
@@ -99,25 +116,6 @@ def update_user(user_id: int, user_update: UserUpdate,db: Session = Depends(get_
 
     return user_to_update
 
-@router.delete("/user/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_user(
-    user_id: int,
-    db: Session = Depends(get_db),
-    current_user: UserModel = Depends(role_required(["admin"]))
-):
-    if current_user == None:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
-                                detail="вы не зарегестрированы")
-    user = db.query(UserModel).filter(UserModel.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Пользователь не найден")
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Пользователь не найден")
-
-    db.delete(user)
-    db.commit()
-    return {}
-
 @router.patch("/{user_id}/ban_status", response_model=User)
 async def update_user_ban_status(
     user_id: int,
@@ -150,3 +148,22 @@ async def update_user_ban_status(
     db.refresh(user_to_update)
 
     return user_to_update
+
+@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(role_required(["admin"]))
+):
+    if current_user == None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                                detail="вы не зарегестрированы")
+    user = db.query(UserModel).filter(UserModel.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Пользователь не найден")
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Пользователь не найден")
+
+    db.delete(user)
+    db.commit()
+    return {}

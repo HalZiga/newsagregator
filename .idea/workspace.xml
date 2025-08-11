@@ -4,7 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="2a240578-1ad4-4bdd-8f1a-4ac28b6929d6" name="Changes" comment="start">
+    <list default="true" id="2a240578-1ad4-4bdd-8f1a-4ac28b6929d6" name="Changes" comment="the basis of the back">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/web/Guard.py" beforeDir="false" afterPath="$PROJECT_DIR$/web/Guard.py" afterDir="false" />
@@ -110,7 +110,15 @@
       <option name="project" value="LOCAL" />
       <updated>1753880300152</updated>
     </task>
-    <option name="localTasksCounter" value="4" />
+    <task id="LOCAL-00004" summary="the basis of the back">
+      <option name="closed" value="true" />
+      <created>1754398592597</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1754398592597</updated>
+    </task>
+    <option name="localTasksCounter" value="5" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -165,6 +173,7 @@
     <MESSAGE value="first work" />
     <MESSAGE value="skeleton" />
     <MESSAGE value="start" />
-    <option name="LAST_COMMIT_MESSAGE" value="start" />
+    <MESSAGE value="the basis of the back" />
+    <option name="LAST_COMMIT_MESSAGE" value="the basis of the back" />
   </component>
 </project>
