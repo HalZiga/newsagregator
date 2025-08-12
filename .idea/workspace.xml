@@ -5,19 +5,13 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="2a240578-1ad4-4bdd-8f1a-4ac28b6929d6" name="Changes" comment="the basis of the back">
-      <change afterPath="$PROJECT_DIR$/web/exception_handlers.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/web/for_test_errors.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/web/services/init_service.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/web/services/news_service.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/web/Guard.py" beforeDir="false" afterPath="$PROJECT_DIR$/web/Guard.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/web/database.py" beforeDir="false" afterPath="$PROJECT_DIR$/web/database.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/web/model_news.py" beforeDir="false" afterPath="$PROJECT_DIR$/web/model_news.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/web/routers/news.py" beforeDir="false" afterPath="$PROJECT_DIR$/web/routers/news.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/web/routers/users.py" beforeDir="false" afterPath="$PROJECT_DIR$/web/routers/users.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/web/schemes.py" beforeDir="false" afterPath="$PROJECT_DIR$/web/schemes.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/web/services/user_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/web/services/user_service.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -76,9 +70,6 @@
     <key name="CopyFile.RECENT_KEYS">
       <recent name="D:\Code\Python_Projects\FAPI" />
     </key>
-    <key name="MoveFile.RECENT_KEYS">
-      <recent name="D:\Code\Python_Projects\FAPI\web" />
-    </key>
   </component>
   <component name="SharedIndexes">
     <attachedChunks>
@@ -127,15 +118,7 @@
       <option name="project" value="LOCAL" />
       <updated>1754398592597</updated>
     </task>
-    <task id="LOCAL-00005" summary="the basis of the back">
-      <option name="closed" value="true" />
-      <created>1754906167943</created>
-      <option name="number" value="00005" />
-      <option name="presentableId" value="LOCAL-00005" />
-      <option name="project" value="LOCAL" />
-      <updated>1754906167943</updated>
-    </task>
-    <option name="localTasksCounter" value="6" />
+    <option name="localTasksCounter" value="5" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
