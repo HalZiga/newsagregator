@@ -80,9 +80,7 @@ class NewsCreate(NewsBase):
     pass
 
 class NewsUpdate(NewsBase):
-    title: Optional[str] = Field(None, min_length=3, max_length=255)
-    body: Optional[str] = Field(None, min_length=10)
-
+    pass
 
 class News(NewsBase):
     id: int
@@ -93,15 +91,12 @@ class News(NewsBase):
     published_at: Optional[datetime] = None
     URL: Optional[str] = None
     views: int = 0
-    created_by: Optional[UserForNews] = None #да я знаю что это лишнее раз ест author, но self.created_by иначе не работает
-    # не могу заставить чтобы питон увидел связи и при вызове author понял все, если найду как - исправлю
+    created_by: Optional[UserForNews] = Field(None, exclude=True)
 
     @computed_field
     @property
     def author(self) -> Optional[str]:
-        if self.created_by and self.created_by.login:
-            return self.created_by.login
-        return "Неизвестен"
+        return getattr(self.created_by, "login", "Неизвестен")
 
 
     class Config:

@@ -77,7 +77,7 @@ class WebNews(Base):
     category = Column(Enum(TagEnum), nullable=False, default=TagEnum.Live) #
     views = Column(Integer, default=0)
 
-    created_by = relationship("User", foreign_keys=[created_by_user_id], back_populates="created_news_items")
+    created_by = relationship("User", foreign_keys=[created_by_user_id], back_populates="created_news_items", lazy="joined")
 
 class Role(Base):
     __tablename__ = 'roles'
