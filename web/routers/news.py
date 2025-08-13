@@ -9,6 +9,9 @@ from web.services.news_service import (
     create_news_service, get_published_news_service, get_all_news_authorized_service, get_news_by_id_service,
     update_news_service, publish_news_service, delete_news_service
 )
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/news", tags=["news"])
 
@@ -57,6 +60,8 @@ async def get_news_by_id(
     db: AsyncSession = Depends(get_db),
     current_user: Optional[UserModel] = Depends(get_current_user)
 ):
+    logger.info("Пользователь '%s' запрашивает новость с ID: %d",
+                current_user.login if current_user else "Неавторизованный пользователь", news_id)
     news_data = await get_news_by_id_service(news_id, db, current_user)
 
     current_user_data = news_data.pop("current_user", None)
@@ -66,7 +71,7 @@ async def get_news_by_id(
     is_admin = RoleEnum.Admin.value in user_roles
     is_author = current_user_data and news_data["created_by_user_id"] == current_user_data["id"]
 
-    can_publish_value = (is_moderator or is_admin) and news_data["status"] == NewsStatusEnum.Draft
+    can_publish_value = is_moderator and news_data["status"] == NewsStatusEnum.Draft
     can_delete_update_value = is_moderator or is_admin or is_author
 
     return NewsWithPermission.model_validate({
@@ -94,7 +99,7 @@ async def update_news(
 async def publish_news(
     news_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: Annotated[UserModel, Depends(get_current_user)] = None,
+    current_user: Annotated[UserModel, Depends(get_current_user)] = None
 ):
     """
     Опубликовать новость. Только для модераторов и администраторов.

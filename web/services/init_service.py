@@ -3,7 +3,9 @@ from sqlalchemy.future import select
 from web.model_news import Role as RoleModel, User as UserModel, RoleEnum
 from web.Guard import hash_password
 import os
+import logging
 
+logger = logging.getLogger(__name__)
 
 async def initialize_database(db: AsyncSession):
     """
@@ -16,7 +18,7 @@ async def initialize_database(db: AsyncSession):
         if not existing_role:
             new_role = RoleModel(name=role_enum_member)
             db.add(new_role)
-            print(f"Добавлена роль: {role_enum_member.value}")
+            logger.info(f"Добавлена роль: {role_enum_member.value}")
 
     admin_username = os.getenv("ADMIN_USERNAME", "admin")
     admin_password = os.getenv("ADMIN_PASSWORD", "adminpass")
@@ -40,8 +42,8 @@ async def initialize_database(db: AsyncSession):
                 roles=[admin_role]
             )
             db.add(new_admin_user)
-            print(f"Создан пользователь Admin: {new_admin_user.login}")
+            logger.info(f"Создан пользователь Admin: {new_admin_user.login}")
         else:
-            print("Роль 'admin' не найдена, не удалось создать администратора.")
+            logger.info("Роль 'admin' не найдена, не удалось создать администратора.")
     else:
-        print(f"Пользователь '{admin_username}' уже существует.")
+        logger.info(f"Пользователь '{admin_username}' уже существует.")

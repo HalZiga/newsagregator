@@ -7,13 +7,15 @@ from web.schemes import NewsCreate, NewsUpdate, News
 from fastapi import HTTPException, status
 from datetime import datetime, timezone
 from sqlalchemy import or_
+import logging
 
+logger = logging.getLogger(__name__)
 
 async def create_news_service(news_data: NewsCreate, db: AsyncSession, current_user: UserModel) -> WebNews:
     """
     Создает новую новость и возвращает полностью загруженный объект новости.
     """
-    # Сначала проверяем и добавляем роль 'Author', если её нет.
+    logger.info("Создание новости от пользователя: %s", current_user.login)
     user_has_author_role = any(role.name == RoleEnum.Author for role in current_user.roles)
     if not user_has_author_role:
         author_role_result = await db.execute(select(Role).where(Role.name == RoleEnum.Author))
@@ -26,8 +28,8 @@ async def create_news_service(news_data: NewsCreate, db: AsyncSession, current_u
         db.add(current_user)
         await db.commit()
         await db.refresh(current_user)
+        logger.info("Роль 'Author' успешно добавлена пользователю %s.", current_user.login)
 
-    # Теперь, когда роли пользователя обновлены, создаем новость.
     new_news = WebNews(
         title=news_data.title,
         body=news_data.body,
@@ -41,8 +43,6 @@ async def create_news_service(news_data: NewsCreate, db: AsyncSession, current_u
     await db.commit()
     await db.refresh(new_news)
 
-    # Явно загружаем все отношения, необходимые для Pydantic-модели, пока сессия еще активна.
-    # Эта логика теперь находится в сервисном слое, где ей и место.
     news_with_relations_result = await db.execute(
         select(WebNews)
         .where(WebNews.id == new_news.id)
@@ -51,6 +51,7 @@ async def create_news_service(news_data: NewsCreate, db: AsyncSession, current_u
     news_with_relations = news_with_relations_result.unique().scalar_one_or_none()
 
     if not news_with_relations:
+        logger.error("После создания не удалось загрузить новость с ID %d с отношениями.", new_news.id)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                             detail="Не удалось загрузить новость с отношениями.")
 
@@ -63,21 +64,27 @@ async  def get_published_news_service(db: AsyncSession) -> List[WebNews]:
         select(WebNews).where(WebNews.status == NewsStatusEnum.Published)
         .order_by(WebNews.published_at.desc()).options(joinedload(WebNews.created_by).joinedload(UserModel.roles))
     )
+    logger.info("Успешно получены опубликованные новости")
     return result.scalars().unique().all()
 
 
 async def get_all_news_authorized_service(db: AsyncSession, current_user: Optional[UserModel]) -> List[WebNews]:
     """Получает все доступные новости авторизованному пользователю."""
+    logger.info("Получение всех новостей")
     user_roles_names = [role.name.value for role in current_user.roles] if current_user and current_user.roles else []
     query = select(WebNews).options(joinedload(WebNews.created_by).joinedload(UserModel.roles))
 
     if current_user and ("admin" in user_roles_names or "moderator" in user_roles_names):
+        logger.info("Пользователь %s администратор/модератор.", current_user.login)
         result = await db.execute(query.order_by(WebNews.created_at.desc()))
     elif current_user:
+        logger.info("Пользователю %s возвращаем его черновики и опубликованные новости.",
+        current_user.login)
         result = await db.execute(query.where(
             or_(WebNews.status == NewsStatusEnum.Published, WebNews.created_by_user_id == current_user.id)
         ).order_by(WebNews.created_at.desc()))
     else:
+        logger.info("Пользователь не авторизован. Возвращаем только опубликованные новости.")
         result = await db.execute(query.where(WebNews.status == NewsStatusEnum.Published).order_by(WebNews.created_at.desc()))
     return result.scalars().unique().all()
 
@@ -91,8 +98,9 @@ async def get_news_by_id_service(
     и увеличением счётчика просмотров.
     Все необходимые данные подгружаются в одном запросе.
     """
+    logger.info("Попытка получить новость с ID: %d для пользователя: %s", news_id,
+                current_user.login if current_user else "неавторизованный пользователь")
 
-    # Если пользователь авторизован — подгружаем его с ролями
     current_user_data = None
     if current_user:
         result_user = await db.execute(
@@ -101,13 +109,16 @@ async def get_news_by_id_service(
             .where(UserModel.id == current_user.id)
         )
         user_obj = result_user.unique().scalar_one_or_none()
+        logger.info("Пользователь автаризован загрузили его данные")
         if user_obj:
             current_user_data = {
                 "id": user_obj.id,
                 "roles": [role.name.value for role in user_obj.roles]
             }
+            logger.info("Загрузка ролей пользователся успешна")
 
-    # Загружаем новость вместе с создателем и ролями создателя
+
+
     result_news = await db.execute(
         select(WebNews)
         .options(
@@ -115,19 +126,22 @@ async def get_news_by_id_service(
         )
         .where(WebNews.id == news_id)
     )
-    news: WebNews = result_news.unique().scalar_one_or_none()
+    news = result_news.unique().scalar_one_or_none()
 
     if not news:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Новость не найдена")
+    logger.info("Загрузка новости вместе с создателем и ролями создателя успешна")
 
-    # Проверка прав
     if news.status != NewsStatusEnum.Published:
         if not current_user_data or not (
             RoleEnum.Admin.value in current_user_data["roles"] or
             RoleEnum.Moderator.value in current_user_data["roles"] or
             current_user_data["id"] == news.created_by_user_id
         ):
+            logger.warning("Пользователь %s попытался получить доступ к неопубликованной новости с ID %d без прав.",
+                           current_user.login if current_user else "неавторизованный пользователь", news_id)
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Нет доступа к этой новости")
+    logger.info("Проверка прав успешна")
 
     response_data = {
         "id": news.id,
@@ -139,7 +153,7 @@ async def get_news_by_id_service(
         "URL": news.URL,
         "tags": news.tags,
         "category": news.category,
-        "views": news.views + 1,  # Сразу отдаем увеличенное значение
+        "views": news.views + 1,
         "created_by": {
             "id": news.created_by.id,
             "login": news.created_by.login,
@@ -148,7 +162,6 @@ async def get_news_by_id_service(
         "current_user": current_user_data
     }
 
-    # Увеличиваем счётчик просмотров
     news.views += 1
     news.redacted_at = datetime.now(timezone.utc).replace(tzinfo=None)
     db.add(news)
@@ -160,6 +173,7 @@ async def get_news_by_id_service(
 
 async def update_news_service(news_id: int, news_data: NewsUpdate, db: AsyncSession, current_user: UserModel) -> WebNews:
     """Обновляет существующую новость с проверкой прав."""
+    logger.info("Пользователь %s пытается обновить новость с Id: %d", current_user.login, news_id)
     news_result = await db.execute(select(WebNews).options(joinedload(WebNews.created_by).joinedload(UserModel.roles)).where(WebNews.id == news_id))
     news = news_result.unique().scalar_one_or_none()
 
@@ -183,14 +197,16 @@ async def update_news_service(news_id: int, news_data: NewsUpdate, db: AsyncSess
     db.add(news)
     await db.commit()
     await db.refresh(news)
+    logger.info("Новость с ID %d успешно обновлена пользователем %s.", news_id, current_user.login)
 
     return news
 
 
 async def publish_news_service(news_id: int, db: AsyncSession, current_user: UserModel) -> WebNews:
     """Публикует новость."""
+    logger.info("Пользователь %s пытается опубликовать новость с ID: %d", current_user.login, news_id)
     user_roles = [role.name.value for role in current_user.roles]
-    if not (RoleEnum.Admin.value in user_roles or RoleEnum.Moderator.value in user_roles):
+    if not (RoleEnum.Moderator.value in user_roles):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Недостаточно прав для публикации новости")
 
     news_result = await db.execute(select(WebNews).options(joinedload(WebNews.created_by).joinedload(UserModel.roles)).where(WebNews.id == news_id))
@@ -207,12 +223,13 @@ async def publish_news_service(news_id: int, db: AsyncSession, current_user: Use
     db.add(news)
     await db.commit()
     await db.refresh(news)
-
+    logger.info("Новость с ID %d успешно опубликована пользователем %s.", news_id, current_user.login)
     return news
 
 
 async def delete_news_service(news_id: int, db: AsyncSession) -> None:
     """Удаляет новость."""
+    logger.info("Попытка удаления новости с ID: %d", news_id)
     news_result = await db.execute(select(WebNews).where(WebNews.id == news_id))
     news = news_result.scalar_one_or_none()
 
@@ -221,3 +238,4 @@ async def delete_news_service(news_id: int, db: AsyncSession) -> None:
 
     await db.delete(news)
     await db.commit()
+    logger.info("Новость с ID %d успешно удалена.", news_id)

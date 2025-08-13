@@ -1,7 +1,7 @@
 from typing import List
 from sqlalchemy.orm import Session
 from web.model_news import User as UserModel
-from web.schemes import User, UserCreate, UserForModerator, UserUpdate
+from web.schemes import User, UserCreate, UserForModerator, UserUpdate, UserUpdateBanStatus
 from web.database import get_db
 from web.Guard import role_required
 from fastapi import Depends, APIRouter, status
@@ -58,7 +58,7 @@ async def update_user(
 @router.patch("/{user_id}/ban_status", response_model=User)
 async def update_user_ban_status(
     user_id: int,
-    in_ban: bool,
+    UserBanStatus: UserUpdateBanStatus,
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(role_required(["admin"]))
 ):
@@ -66,7 +66,7 @@ async def update_user_ban_status(
     Заблокировать или разблокировать пользователя по ID.
     Доступно только для администраторов.
     """
-    return await update_user_ban_status_service(user_id=user_id, in_ban=in_ban, db=db, current_user=current_user)
+    return await update_user_ban_status_service(user_id=user_id, UserBanStatus=UserBanStatus, db=db, current_user=current_user)
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_user(

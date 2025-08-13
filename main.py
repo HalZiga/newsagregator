@@ -18,11 +18,16 @@ from web.exception_handlers import (
     integrity_error_handler, http_exception_handler, validation_exception_handler,
     catch_all_exception_handler
 )
+import logging
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
 load_dotenv()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("Запуск приложения, БД и начальных данных")
+    logger.info("Запуск приложения, БД и начальных данных")
     async with engine.begin() as conn: # асинхронный контекстный менеджер
         await conn.run_sync(Base.metadata.create_all) #run_sync запускает в отдельном потоке
     db = SessionLocal()
@@ -35,7 +40,7 @@ async def lifespan(app: FastAPI):
     finally:
         await db.close()
     yield
-    print("Завершаем приложение")
+    logger.info("Завершаем приложение")
 
 app = FastAPI(lifespan=lifespan)
 
@@ -76,9 +81,11 @@ async def login_for_access_token(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
     db: Session = Depends(get_db)
 ):
+    logger.info("Попытка аутентификации для пользователя: %s", form_data.username)
     user = await get_user_by_login(db, form_data.username)
 
     if not user or not verify_password(form_data.password, user.password):
+        logger.warning("Неудачная попытка входа для пользователя: %s", form_data.username)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Неправильный логин или пароль",
@@ -90,6 +97,7 @@ async def login_for_access_token(
             detail="Ваша учетная запись заблокирована",
         )
 
+    logger.info("Пользователь '%s' успешно аутентифицирован.", user.login)
     access_token = create_access_token(
         data={"sub": user.login, "id": user.id, "roles": [role.name.value for role in user.roles]},
     )

@@ -9,9 +9,10 @@ from fastapi.security import OAuth2PasswordBearer
 from web.database import get_db
 from web.model_news import User
 from web.schemes import TokenData
-import os
+import os, logging
 from passlib.context import CryptContext
 
+logger = logging.getLogger(__name__)
 load_dotenv()
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -42,11 +43,12 @@ def decode_access_token(token: str) -> Optional[dict]:
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token", auto_error=False)
 
-async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)):
+async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)) ->User:
     if not token:
+        logger.warning("Отсутствует токен. Возвращаем 401.")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Невалидный токен или токен не предоставлен",
+            detail="Невалидный токен или токенa нет",
             headers={"WWW-Authenticate": "Bearer"},
         )
     try:
@@ -55,6 +57,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession
         if username is None:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Токен не содержит данных пользователя")
         token_data = TokenData(username=username, roles=payload.get("roles", []), id=payload.get("id"))
+        logger.info(f"Токен успешно декодирован для пользователя: {username}")
     except JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -69,6 +72,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession
 
 def role_required(required_roles: List[str]):
     async def role_checker(current_user: User = Depends(get_current_user), token: str = Depends(oauth2_scheme)):
+        logger.debug(f"Начало проверки ролей для пользователя '{current_user.login}'. Требуемые роли: {required_roles}")
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_roles_from_token: List[str] = payload.get("roles", [])
         user_roles_names = [role for role in user_roles_from_token]
@@ -77,5 +81,6 @@ def role_required(required_roles: List[str]):
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Недостаточно прав для выполнения операции"
             )
+        logger.info(f"Пользователь '{current_user.login}' авторизован с ролями {user_roles_names}.")
         return current_user
     return role_checker
