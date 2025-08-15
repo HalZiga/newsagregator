@@ -1,4 +1,4 @@
-from web.database import SessionLocal, Base, engine
+from web.database import SessionLocal
 from web.model_news import Role, RoleEnum
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session

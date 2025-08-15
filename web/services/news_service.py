@@ -1,10 +1,9 @@
-from cffi.model import VoidType
-from sqlalchemy.orm import joinedload, subqueryload, selectinload
+from sqlalchemy.orm import joinedload, selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from typing import List, Optional
 from web.model_news import WebNews, User as UserModel, NewsStatusEnum, RoleEnum, Role
-from web.schemes import NewsCreate, NewsUpdate, News, UserForNews
+from web.schemes import NewsCreate, NewsUpdate
 from fastapi import HTTPException, status
 from datetime import datetime, timezone
 from sqlalchemy import or_
@@ -19,7 +18,7 @@ async def create_news_service(news_data: NewsCreate, db: AsyncSession, current_u
     logger.info("Создание новости от пользователя: %s", current_user.login)
     user_has_author_role = any(role.name == RoleEnum.Author for role in current_user.roles)
     if not user_has_author_role:
-        author_role_result = await db.execute(select(Role).where(Role.name == RoleEnum.Author))
+        author_role_result = await db.execute(select(Role).where(Role.name.is_(RoleEnum.Author)))
         author_role = author_role_result.scalar_one_or_none()
 
         if not author_role:
@@ -46,7 +45,7 @@ async def create_news_service(news_data: NewsCreate, db: AsyncSession, current_u
 
     news_with_relations_result = await db.execute(
         select(WebNews)
-        .where(WebNews.id == new_news.id)
+        .where(WebNews.id.is_(new_news.id))
         .options(joinedload(WebNews.created_by).joinedload(UserModel.roles))
     )
     news_with_relations = news_with_relations_result.unique().scalar_one_or_none()
@@ -62,11 +61,11 @@ async def create_news_service(news_data: NewsCreate, db: AsyncSession, current_u
 async  def get_published_news_service(db: AsyncSession) -> List[WebNews]:
     """Получает список всех опубликованных новостей."""
     result = await db.execute(
-        select(WebNews).where(WebNews.status == NewsStatusEnum.Published)
+        select(WebNews).where(WebNews.status.is_(NewsStatusEnum.Published))
         .order_by(WebNews.published_at.desc()).options(joinedload(WebNews.created_by).joinedload(UserModel.roles))
     )
     logger.info("Успешно получены опубликованные новости")
-    return result.scalars().unique().all()
+    return list(result.scalars().unique().all())
 
 
 async def get_all_news_authorized_service(db: AsyncSession, current_user: Optional[UserModel]) -> List[WebNews]:
@@ -86,8 +85,8 @@ async def get_all_news_authorized_service(db: AsyncSession, current_user: Option
         ).order_by(WebNews.created_at.desc()))
     else:
         logger.info("Пользователь не авторизован. Возвращаем только опубликованные новости.")
-        result = await db.execute(query.where(WebNews.status == NewsStatusEnum.Published).order_by(WebNews.created_at.desc()))
-    return result.scalars().unique().all()
+        result = await db.execute(query.where(WebNews.status.is_(NewsStatusEnum.Published)).order_by(WebNews.created_at.desc()))
+    return list(result.scalars().unique().all())
 
 async def get_news_by_id_service(
     news_id: int,
@@ -107,7 +106,7 @@ async def get_news_by_id_service(
         result_user = await db.execute(
             select(UserModel)
             .options(joinedload(UserModel.roles))
-            .where(UserModel.id == current_user.id)
+            .where(UserModel.id.is_(current_user.id))
         )
         user_obj = result_user.unique().scalar_one_or_none()
         logger.info("Пользователь автаризован загрузили его данные")
@@ -125,7 +124,7 @@ async def get_news_by_id_service(
         .options(
             joinedload(WebNews.created_by).joinedload(UserModel.roles)
         )
-        .where(WebNews.id == news_id)
+        .where(WebNews.id.is_(news_id))
     )
     news = result_news.unique().scalar_one_or_none()
 
@@ -151,6 +150,7 @@ async def get_news_by_id_service(
         "status": news.status,
         "created_by_user_id": news.created_by_user_id,
         "created_at": news.created_at,
+        "published_at": news.published_at,
         "URL": news.URL,
         "tags": news.tags,
         "category": news.category,
@@ -172,7 +172,7 @@ async def update_news_service(news_id: int, news_data: NewsUpdate, db: AsyncSess
     """Обновляет существующую новость с проверкой прав."""
     logger.info("Пользователь %s пытается обновить новость с Id: %d", current_user.login, news_id)
     news_result = await db.execute(select(WebNews).options(
-        selectinload(WebNews.created_by).selectinload(UserModel.roles)).where(WebNews.id == news_id))
+        selectinload(WebNews.created_by).selectinload(UserModel.roles)).where(WebNews.id.is_(news_id)))
     news = news_result.unique().scalars().one_or_none()
 
     author_login:str = news.created_by.login
@@ -231,7 +231,7 @@ async def publish_news_service(news_id: int, db: AsyncSession, current_user: Use
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Недостаточно прав для публикации новости")
 
     news_result = await db.execute(select(WebNews)
-            .options(joinedload(WebNews.created_by).subqueryload(UserModel.roles)).where(WebNews.id == news_id))
+            .options(joinedload(WebNews.created_by).subqueryload(UserModel.roles)).where(WebNews.id.is_(news_id)))
     news = news_result.unique().scalar_one_or_none()
 
     if not news:
@@ -256,7 +256,7 @@ async def publish_news_service(news_id: int, db: AsyncSession, current_user: Use
 async def delete_news_service(news_id: int, db: AsyncSession) -> None:
     """Удаляет новость."""
     logger.info("Попытка удаления новости с ID: %d", news_id)
-    news_result = await db.execute(select(WebNews).where(WebNews.id == news_id))
+    news_result = await db.execute(select(WebNews).where(WebNews.id.is_(news_id)))
     news = news_result.scalar_one_or_none()
 
     if not news:

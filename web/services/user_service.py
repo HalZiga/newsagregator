@@ -1,8 +1,8 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.orm import joinedload, subqueryload, selectinload
+from sqlalchemy.orm import joinedload, selectinload
 from typing import List
-from web.model_news import User as UserModel, Role as RoleModel, RoleEnum, WebNews
+from web.model_news import User as UserModel, Role as RoleModel, RoleEnum
 from web.schemes import UserUpdate, UserCreate, UserUpdateBanStatus
 from web.Guard import hash_password
 from fastapi import HTTPException, status
@@ -18,7 +18,7 @@ async def get_all_roles_service(db: AsyncSession) -> List[RoleModel]:
     return roles
 
 async def get_user_by_login(db: AsyncSession, login: str) -> UserModel:
-    result = await db.execute(select(UserModel).where(UserModel.login == login).options(joinedload(UserModel.roles)))
+    result = await db.execute(select(UserModel).where(UserModel.login.is_(login)).options(joinedload(UserModel.roles)))
     user = result.unique().scalar_one_or_none()
     if user:
         logger.info("Пользователь '%s' найден.", login)
@@ -32,12 +32,12 @@ async def create_new_user(user: UserCreate, db: AsyncSession) -> UserModel:
     """
 
     logger.info("Начало создания нового пользователя: %s", user.login)
-    reader_role_result = await db.execute(select(RoleModel).where(RoleModel.name == RoleEnum.Reader))
+    reader_role_result = await db.execute(select(RoleModel).where(RoleModel.name.is_(RoleEnum.Reader)))
     reader_role = reader_role_result.scalar_one_or_none()
     if not reader_role:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Роль 'Reader' не найдена.")
 
-    existing_user_result = await db.execute(select(UserModel).where(UserModel.login == user.login))
+    existing_user_result = await db.execute(select(UserModel).where(UserModel.login.is_(user.login)))
     existing_user = existing_user_result.scalar_one_or_none()
     if existing_user:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Логин уже занят")
@@ -59,14 +59,15 @@ async def create_new_user(user: UserCreate, db: AsyncSession) -> UserModel:
     await db.commit()
     await db.refresh(user_obj)
 
-    user_with_roles = await db.execute(
+    user_with_roles_result = await db.execute(
         select(UserModel)
-        .where(UserModel.id == user_obj.id)
+        .where(UserModel.id.is_(user_obj.id))
         .options(joinedload(UserModel.roles))
     )
+    user_with_roles = user_with_roles_result.unique().scalar_one_or_none()
 
     logger.info("Пользователь '%s' успешно создан с ID: %s", user_with_roles.login, user_with_roles.id)
-    return user_with_roles.unique().scalar_one_or_none()
+    return user_with_roles
 
 async def update_user_data(
     user_id: int,
@@ -81,7 +82,7 @@ async def update_user_data(
 
     logger.info("Начало обновления данных для пользователя с ID: %d", user_id)
     user_to_update_result = await db.execute(select(UserModel)
-        .options(selectinload(UserModel.roles)).where(UserModel.id == user_id))
+        .options(selectinload(UserModel.roles)).where(UserModel.id.is_(user_id)))
     user_to_update = user_to_update_result.unique().scalars().one_or_none()
     if not user_to_update:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Пользователь не найден")
@@ -123,7 +124,7 @@ async def update_user_data(
     result = await db.execute(
         select(UserModel)
         .options(selectinload(UserModel.roles))
-        .where(UserModel.id == user_id)
+        .where(UserModel.id.is_(user_id))
     )
     updated_user_with_relations = result.unique().scalars().one_or_none()
 
@@ -140,7 +141,7 @@ async def get_users_list(db: AsyncSession, current_user: UserModel) -> List[User
         result = await db.execute(select(UserModel).
                                   options(joinedload(UserModel.roles)))
         logger.info("Список пользователей успешно получен")
-        return result.scalars().unique().all()
+        return list(result.scalars().unique().all())
     else:
         logger.warning("Пользователь '%s' (Id: %d) попытался получить список пользователей без необходимых прав.",
         current_user.login, current_user.id)
@@ -155,7 +156,7 @@ async def get_user_by_id_service(user_id: int, db: AsyncSession, current_user: U
     logger.debug("Попытка получить пользователя с Id: %d", user_id)
     user_roles = [role.name.value for role in current_user.roles]
     user_result = await db.execute(select(UserModel)
-    .options(joinedload(UserModel.roles)).where(UserModel.id == user_id))
+    .options(joinedload(UserModel.roles)).where(UserModel.id.is_(user_id)))
     user = user_result.unique().scalar_one_or_none()
 
     if not user:
@@ -173,13 +174,13 @@ async def get_user_by_id_service(user_id: int, db: AsyncSession, current_user: U
                             detail="Недостаточно прав для просмотра этого пользователя")
 
 
-async def update_user_ban_status_service(user_id: int, UserBanStatus: UserUpdateBanStatus, db: AsyncSession, current_user: UserModel) -> UserModel:
+async def update_user_ban_status_service(user_id: int, userbanstatus: UserUpdateBanStatus, db: AsyncSession, current_user: UserModel) -> UserModel:
     """
     Бизнес-логика для изменения статуса бана.
     """
     logger.debug("Изменение бана польщователся с Id: %d", user_id)
     user_to_update_result = await db.execute(select(UserModel)
-    .options(joinedload(UserModel.roles)).where(UserModel.id == user_id))
+    .options(joinedload(UserModel.roles)).where(UserModel.id.is_(user_id)))
     user_to_update = user_to_update_result.unique().scalar_one_or_none()
     if not user_to_update:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Пользователь не найден")
@@ -190,17 +191,17 @@ async def update_user_ban_status_service(user_id: int, UserBanStatus: UserUpdate
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail="Вы не можете изменить статус блокировки для самого себя.")
 
-    if user_to_update.in_ban == UserBanStatus.in_ban:
-        logger.info("Пришел статус бана, который уже у пользователся: %s", UserBanStatus.in_ban)
+    if user_to_update.in_ban == userbanstatus.in_ban:
+        logger.info("Пришел статус бана, который уже у пользователся: %s", userbanstatus.in_ban)
         return user_to_update
 
-    user_to_update.in_ban = UserBanStatus.in_ban
+    user_to_update.in_ban = userbanstatus.in_ban
     user_to_update.updated = datetime.now(timezone.utc).replace(tzinfo=None)
 
     db.add(user_to_update)
     await db.commit()
     await db.refresh(user_to_update)
-    logger.info("Бан для пользователя с Id %d изменен на %s.", user_id, UserBanStatus.in_ban)
+    logger.info("Бан для пользователя с Id %d изменен на %s.", user_id, userbanstatus.in_ban)
     return user_to_update
 
 
@@ -208,7 +209,7 @@ async def delete_user_service(user_id: int, db: AsyncSession) -> None:
     """
     Бизнес-логика для удаления пользователя.
     """
-    user_result = await db.execute(select(UserModel).where(UserModel.id == user_id))
+    user_result = await db.execute(select(UserModel).where(UserModel.id.is_(user_id)))
     user = user_result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Пользователь не найден")

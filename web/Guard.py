@@ -43,14 +43,10 @@ def decode_access_token(token: str) -> Optional[dict]:
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token", auto_error=False)
 
-async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)) ->User:
+async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)) -> Optional[User]:
     if not token:
-        logger.warning("Отсутствует токен. Возвращаем 401.")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Невалидный токен или токенa нет",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        logger.warning("Отсутствует токен.")
+        return None
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
@@ -64,7 +60,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession
             detail="Невалидный токен",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    user_result = await db.execute(select(User).options(joinedload(User.roles)).where(User.login == username))
+    user_result = await db.execute(select(User).options(joinedload(User.roles)).where(User.login.is_(username)))
     user = user_result.scalars().unique().one_or_none()
     if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Пользователь не найден")
@@ -72,6 +68,11 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession
 
 def role_required(required_roles: List[str]):
     async def role_checker(current_user: User = Depends(get_current_user), token: str = Depends(oauth2_scheme)):
+        if current_user == None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Не передан токен"
+            )
         logger.debug(f"Начало проверки ролей для пользователя '{current_user.login}'. Требуемые роли: {required_roles}")
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_roles_from_token: List[str] = payload.get("roles", [])

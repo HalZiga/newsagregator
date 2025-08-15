@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field, computed_field
+from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, Annotated
 from datetime import datetime
 from web.model_news import RoleEnum, TagEnum, NewsStatusEnum

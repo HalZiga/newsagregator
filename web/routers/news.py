@@ -73,7 +73,7 @@ async def get_news_by_id(
 
     is_moderator = RoleEnum.Moderator.value in user_roles
     is_admin = RoleEnum.Admin.value in user_roles
-    is_author = current_user_data and news_data["created_by_user_id"] == current_user_data["id"]
+    is_author = bool(current_user_data) and news_data["created_by_user_id"] == current_user_data["id"]
 
     can_publish_value = is_moderator and news_data["status"] == NewsStatusEnum.Draft
     can_delete_update_value = is_moderator or is_admin or is_author

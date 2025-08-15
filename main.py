@@ -1,7 +1,7 @@
 from typing import List, Annotated
 from dotenv import load_dotenv
 from contextlib import asynccontextmanager
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
@@ -69,7 +69,7 @@ app.add_middleware(
 )
 
 @app.get("/roles/", response_model=List[Role])
-async def get_roles(db: Session = Depends(get_db)):
+async def get_roles(db: AsyncSession = Depends(get_db)):
     return await get_all_roles_service(db)
 
 
@@ -79,7 +79,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 @app.post("/token", response_model=Token)
 async def login_for_access_token(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     logger.info("Попытка аутентификации для пользователя: %s", form_data.username)
     user = await get_user_by_login(db, form_data.username)

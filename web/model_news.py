@@ -1,6 +1,5 @@
 import enum
 from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Enum, ForeignKey, Table
-from sqlalchemy.dialects import postgresql
 from sqlalchemy.dialects.sqlite import JSON as SQLiteJSON
 from web.database import Base
 from sqlalchemy.orm import relationship
