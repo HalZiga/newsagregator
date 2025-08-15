@@ -1,9 +1,10 @@
-from sqlalchemy.orm import joinedload
+from cffi.model import VoidType
+from sqlalchemy.orm import joinedload, subqueryload, selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from typing import List, Optional
 from web.model_news import WebNews, User as UserModel, NewsStatusEnum, RoleEnum, Role
-from web.schemes import NewsCreate, NewsUpdate, News
+from web.schemes import NewsCreate, NewsUpdate, News, UserForNews
 from fastapi import HTTPException, status
 from datetime import datetime, timezone
 from sqlalchemy import or_
@@ -154,11 +155,7 @@ async def get_news_by_id_service(
         "tags": news.tags,
         "category": news.category,
         "views": news.views + 1,
-        "created_by": {
-            "id": news.created_by.id,
-            "login": news.created_by.login,
-            "roles": [{"id": role.id, "name": role.name.value} for role in news.created_by.roles]
-        },
+        "author": news.created_by.login,
         "current_user": current_user_data
     }
 
@@ -171,11 +168,14 @@ async def get_news_by_id_service(
 
 
 
-async def update_news_service(news_id: int, news_data: NewsUpdate, db: AsyncSession, current_user: UserModel) -> WebNews:
+async def update_news_service(news_id: int, news_data: NewsUpdate, db: AsyncSession, current_user: UserModel):
     """Обновляет существующую новость с проверкой прав."""
     logger.info("Пользователь %s пытается обновить новость с Id: %d", current_user.login, news_id)
-    news_result = await db.execute(select(WebNews).options(joinedload(WebNews.created_by).joinedload(UserModel.roles)).where(WebNews.id == news_id))
-    news = news_result.unique().scalar_one_or_none()
+    news_result = await db.execute(select(WebNews).options(
+        selectinload(WebNews.created_by).selectinload(UserModel.roles)).where(WebNews.id == news_id))
+    news = news_result.unique().scalars().one_or_none()
+
+    author_login:str = news.created_by.login
 
     if not news:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Новость не найдена")
@@ -188,18 +188,39 @@ async def update_news_service(news_id: int, news_data: NewsUpdate, db: AsyncSess
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
                             detail="У вас нет прав на редактирование этой новости.")
 
-    update_data = news_data.model_dump(exclude_unset=True)
+    response_data = {
+        "id": news.id,
+        "title": news.title,
+        "body": news.body,
+        "status": news.status,
+        "created_by_user_id": news.created_by_user_id,
+        "created_at": news.created_at,
+        "URL": news.URL,
+        "tags": news.tags,
+        "category": news.category,
+        "views": news.views + 1
+    }
 
+    update_data = news_data.model_dump(exclude_unset=True)
     for key, value in update_data.items():
         setattr(news, key, value)
 
     news.redacted_at = datetime.now(timezone.utc).replace(tzinfo=None)
-    db.add(news)
-    await db.commit()
-    await db.refresh(news)
-    logger.info("Новость с ID %d успешно обновлена пользователем %s.", news_id, current_user.login)
 
-    return news
+
+
+    logger.info("Пользователь %s получил все данные", current_user.login)
+    db.add(news)
+    logger.info("Новость после add до flash")
+    #await db.flush()  # Применяем изменения в транзакции, но не закрываем ее
+    logger.info("Новость после flash до refresh")
+    #await db.refresh(news, attribute_names=['created_by'])  # Обновляем объект и его явные связи
+    logger.info("Новость после refresh до commit")
+    # Шаг 5: Коммитим транзакцию. Теперь это безопасно.
+    await db.commit()
+    #db.expunge(news)
+    logger.info("Новость после commit")
+    return response_data
 
 
 async def publish_news_service(news_id: int, db: AsyncSession, current_user: UserModel) -> WebNews:
@@ -209,7 +230,8 @@ async def publish_news_service(news_id: int, db: AsyncSession, current_user: Use
     if not (RoleEnum.Moderator.value in user_roles):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Недостаточно прав для публикации новости")
 
-    news_result = await db.execute(select(WebNews).options(joinedload(WebNews.created_by).joinedload(UserModel.roles)).where(WebNews.id == news_id))
+    news_result = await db.execute(select(WebNews)
+            .options(joinedload(WebNews.created_by).subqueryload(UserModel.roles)).where(WebNews.id == news_id))
     news = news_result.unique().scalar_one_or_none()
 
     if not news:
@@ -220,10 +242,14 @@ async def publish_news_service(news_id: int, db: AsyncSession, current_user: Use
     news.status = NewsStatusEnum.Published
     news.published_at = datetime.now(timezone.utc).replace(tzinfo=None)
     news.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    logger.info("Получили данные ")
     db.add(news)
     await db.commit()
+    logger.info("Коммит успешен")
     await db.refresh(news)
-    logger.info("Новость с ID %d успешно опубликована пользователем %s.", news_id, current_user.login)
+    logger.info("Новость с ID %d успешно опубликована", news_id)
+
+    logger.info("Данные возращаются")
     return news
 
 

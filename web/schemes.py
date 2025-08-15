@@ -92,22 +92,15 @@ class News(NewsBase):
     id: int
     status: NewsStatusEnum
     created_by_user_id: int
-    created_at: datetime
+    created_at: Optional[datetime]
     updated_at: Optional[datetime] = None
     published_at: Optional[datetime] = None
     URL: Optional[str] = None
     views: int = 0
-    created_by: Optional[UserForNews] = Field(None, exclude=True)
-
-    @computed_field
-    @property
-    def author(self) -> Optional[str]:
-        return getattr(self.created_by, "login", "Неизвестен")
-
+    author: Optional[str] = Field(None)
 
     class Config:
         from_attributes = True
-        extra = 'allow'
 
 class NewsWithPermission(News):
     can_publish: bool

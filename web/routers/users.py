@@ -53,7 +53,7 @@ async def update_user(
         db=db,
         current_user=current_user
     )
-    return updated_user
+    return User.model_validate(updated_user)
 
 @router.patch("/{user_id}/ban_status", response_model=User)
 async def update_user_ban_status(

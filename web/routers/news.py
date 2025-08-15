@@ -40,7 +40,8 @@ async def get_published_news(
     Получить список всех опубликованных новостей. Доступно всем без авторизации.
     """
     news_list = await get_published_news_service(db=db)
-    return [News.model_validate(item) for item in news_list]
+    return [News.model_validate({**item.__dict__,
+    "author": item.created_by.login}) for item in news_list]
 
 
 @router.get("/", response_model=list[News])
@@ -51,8 +52,11 @@ async def get_all_news_authorized(
     """
     Получить все доступные новости авторизованному пользователю.
     """
+
     news_list = await get_all_news_authorized_service(db=db, current_user=current_user)
-    return [News.model_validate(item) for item in news_list]
+
+    return [News.model_validate({**item.__dict__,
+        "author": item.created_by.login})for item in news_list]
 
 @router.get("/{news_id}", response_model=NewsWithPermission)
 async def get_news_by_id(
@@ -80,6 +84,7 @@ async def get_news_by_id(
         "can_delete_update": can_delete_update_value
     })
 
+
 @router.patch("/{news_id}", response_model=News)
 async def update_news(
         news_id: int,
@@ -91,7 +96,11 @@ async def update_news(
     Обновить существующую новость.
     Автор может обновлять только свои новости. Админ/модератор могут обновлять любые.
     """
+    logger.info("метод по обновлению новости начнется")
     updated_news = await update_news_service(news_id=news_id, news_data=news_data, db=db, current_user=current_user)
+    logger.info("метод по обновлению новости завершен")
+    # updated_news = await get_news_by_id(news_id=news_id, db=db, current_user=current_user)
+    # logger.info("возвращение данных завершено")
     return News.model_validate(updated_news)
 
 

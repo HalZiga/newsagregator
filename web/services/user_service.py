@@ -1,8 +1,8 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, subqueryload, selectinload
 from typing import List
-from web.model_news import User as UserModel, Role as RoleModel, RoleEnum
+from web.model_news import User as UserModel, Role as RoleModel, RoleEnum, WebNews
 from web.schemes import UserUpdate, UserCreate, UserUpdateBanStatus
 from web.Guard import hash_password
 from fastapi import HTTPException, status
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 async def get_all_roles_service(db: AsyncSession) -> List[RoleModel]:
     result = await db.execute(select(RoleModel))
-    roles = list(result.scalars().all())
+    roles = list(result.unique().scalars().all())
     logger.info("Успешно получено %d ролей.", len(roles))
     return roles
 
@@ -80,8 +80,9 @@ async def update_user_data(
     """
 
     logger.info("Начало обновления данных для пользователя с ID: %d", user_id)
-    user_to_update_result = await db.execute(select(UserModel).where(UserModel.id == user_id))
-    user_to_update = user_to_update_result.scalar_one_or_none()
+    user_to_update_result = await db.execute(select(UserModel)
+        .options(selectinload(UserModel.roles)).where(UserModel.id == user_id))
+    user_to_update = user_to_update_result.unique().scalars().one_or_none()
     if not user_to_update:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Пользователь не найден")
 
@@ -118,9 +119,16 @@ async def update_user_data(
 
     db.add(user_to_update)
     await db.commit()
-    await db.refresh(user_to_update)
+    #И ТУТ ТОЖЕ АААААА
+    result = await db.execute(
+        select(UserModel)
+        .options(selectinload(UserModel.roles))
+        .where(UserModel.id == user_id)
+    )
+    updated_user_with_relations = result.unique().scalars().one_or_none()
+
     logger.info("Данные пользователя с ID %d успешно обновлены.", user_id)
-    return user_to_update
+    return updated_user_with_relations
 
 async def get_users_list(db: AsyncSession, current_user: UserModel) -> List[UserModel]:
     """
@@ -129,7 +137,8 @@ async def get_users_list(db: AsyncSession, current_user: UserModel) -> List[User
     user_roles = [role.name.value for role in current_user.roles]
 
     if "admin" in user_roles or "moderator" in user_roles:
-        result = await db.execute(select(UserModel).options(joinedload(UserModel.roles)))
+        result = await db.execute(select(UserModel).
+                                  options(joinedload(UserModel.roles)))
         logger.info("Список пользователей успешно получен")
         return result.scalars().unique().all()
     else:
@@ -145,7 +154,8 @@ async def get_user_by_id_service(user_id: int, db: AsyncSession, current_user: U
     """
     logger.debug("Попытка получить пользователя с Id: %d", user_id)
     user_roles = [role.name.value for role in current_user.roles]
-    user_result = await db.execute(select(UserModel).options(joinedload(UserModel.roles)).where(UserModel.id == user_id))
+    user_result = await db.execute(select(UserModel)
+    .options(joinedload(UserModel.roles)).where(UserModel.id == user_id))
     user = user_result.unique().scalar_one_or_none()
 
     if not user:
@@ -168,7 +178,8 @@ async def update_user_ban_status_service(user_id: int, UserBanStatus: UserUpdate
     Бизнес-логика для изменения статуса бана.
     """
     logger.debug("Изменение бана польщователся с Id: %d", user_id)
-    user_to_update_result = await db.execute(select(UserModel).options(joinedload(UserModel.roles)).where(UserModel.id == user_id))
+    user_to_update_result = await db.execute(select(UserModel)
+    .options(joinedload(UserModel.roles)).where(UserModel.id == user_id))
     user_to_update = user_to_update_result.unique().scalar_one_or_none()
     if not user_to_update:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Пользователь не найден")

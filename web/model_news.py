@@ -1,6 +1,7 @@
 import enum
 from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Enum, ForeignKey, Table
 from sqlalchemy.dialects import postgresql
+from sqlalchemy.dialects.sqlite import JSON as SQLiteJSON
 from web.database import Base
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
@@ -58,8 +59,8 @@ class User(Base):
     ban_at = Column(DateTime)
 
 
-    roles = relationship("Role", secondary=user_roles, back_populates="users")
-    created_news_items = relationship("WebNews", back_populates="created_by")
+    roles = relationship("Role", secondary=user_roles, back_populates="users", lazy="selectin")
+    created_news_items = relationship("WebNews", back_populates="created_by", lazy="selectin")
 
 class WebNews(Base):
     __tablename__ = "news"
@@ -73,11 +74,11 @@ class WebNews(Base):
     created_at = Column(DateTime)
     published_at = Column(DateTime)
     redacted_at = Column(DateTime)
-    tags = Column(postgresql.JSONB, default=list, nullable=False)
+    tags = Column(SQLiteJSON , default=list, nullable=False)
     category = Column(Enum(TagEnum), nullable=False, default=TagEnum.Live) #
     views = Column(Integer, default=0)
 
-    created_by = relationship("User", foreign_keys=[created_by_user_id], back_populates="created_news_items", lazy="joined")
+    created_by = relationship("User", foreign_keys=[created_by_user_id], back_populates="created_news_items", lazy="selectin")
 
 class Role(Base):
     __tablename__ = 'roles'
@@ -85,5 +86,5 @@ class Role(Base):
     id = Column(Integer, primary_key=True)
     name = Column(Enum(RoleEnum), nullable=True)
 
-    users = relationship("User", secondary=user_roles, back_populates="roles")
+    users = relationship("User", secondary=user_roles, back_populates="roles", lazy="selectin")
 
