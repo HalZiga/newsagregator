@@ -74,7 +74,7 @@ async def get_all_news_authorized_service(db: AsyncSession, current_user: Option
     user_roles_names = [role.name.value for role in current_user.roles] if current_user and current_user.roles else []
     query = select(WebNews).options(joinedload(WebNews.created_by).joinedload(UserModel.roles))
 
-    if current_user and ("admin" in user_roles_names or "moderator" in user_roles_names):
+    if current_user and (RoleEnum.Admin.value in user_roles_names or RoleEnum.Moderator.value in user_roles_names):
         logger.info("Пользователь %s администратор/модератор.", current_user.login)
         result = await db.execute(query.order_by(WebNews.created_at.desc()))
     elif current_user:
@@ -175,8 +175,6 @@ async def update_news_service(news_id: int, news_data: NewsUpdate, db: AsyncSess
         selectinload(WebNews.created_by).selectinload(UserModel.roles)).where(WebNews.id.is_(news_id)))
     news = news_result.unique().scalars().one_or_none()
 
-    author_login:str = news.created_by.login
-
     if not news:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Новость не найдена")
 
@@ -253,11 +251,17 @@ async def publish_news_service(news_id: int, db: AsyncSession, current_user: Use
     return news
 
 
-async def delete_news_service(news_id: int, db: AsyncSession) -> None:
+async def delete_news_service(news_id: int, db: AsyncSession, current_user: UserModel) -> None:
     """Удаляет новость."""
     logger.info("Попытка удаления новости с ID: %d", news_id)
     news_result = await db.execute(select(WebNews).where(WebNews.id.is_(news_id)))
     news = news_result.scalar_one_or_none()
+
+    user_roles = [role.name.value for role in current_user.roles]
+    is_author_of_this_news = current_user.id == news.created_by_user_id
+
+    if not (RoleEnum.Moderator.value in user_roles or RoleEnum.Admin.value in user_roles) and not is_author_of_this_news:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Недостаточно прав для удаления новости новости")
 
     if not news:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Новость не найдена")

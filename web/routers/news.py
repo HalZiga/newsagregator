@@ -26,7 +26,7 @@ async def get_available_categories():
 async def create_news(
         news_data: NewsCreate,
         db: AsyncSession = Depends(get_db),
-        current_user: UserModel = Depends(role_required(["admin", "moderator", "author", "reader"]))
+        current_user: UserModel = Depends(role_required([RoleEnum.Admin.value, RoleEnum.Moderator.value, RoleEnum.Author.value, RoleEnum.Reader.value]))
 ):
     new_news = await create_news_service(news_data=news_data, db=db, current_user=current_user)
     return News.model_validate(new_news)
@@ -90,7 +90,7 @@ async def update_news(
         news_id: int,
         news_data: NewsUpdate,
         db: AsyncSession = Depends(get_db),
-        current_user: UserModel = Depends(role_required(["admin", "moderator", "author"]))
+        current_user: UserModel = Depends(role_required([RoleEnum.Admin.value, RoleEnum.Moderator.value, RoleEnum.Author.value]))
 ):
     """
     Обновить существующую новость.
@@ -120,11 +120,11 @@ async def publish_news(
 async def delete_news(
         news_id: int,
         db: AsyncSession = Depends(get_db),
-        current_user: UserModel = Depends(role_required(["admin", "moderator"]))
+        current_user: UserModel = Depends(role_required([RoleEnum.Admin.value, RoleEnum.Moderator.value, RoleEnum.Author.value]))
 ):
     """
     Удалить новость по ID. Доступно только для 'admin' и 'moderator'.
     """
-    await delete_news_service(news_id=news_id, db=db)
+    await delete_news_service(news_id=news_id, db=db, current_user=current_user)
     return {}
 

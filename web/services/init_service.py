@@ -4,8 +4,12 @@ from web.model_news import Role as RoleModel, User as UserModel, RoleEnum
 from web.Guard import hash_password
 import os
 import logging
+from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
+
+load_dotenv()
+
 
 async def initialize_database(db: AsyncSession):
     """

@@ -7,7 +7,7 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload
 from fastapi.security import OAuth2PasswordBearer
 from web.database import get_db
-from web.model_news import User
+from web.model_news import User, RoleEnum
 from web.schemes import TokenData
 import os, logging
 from passlib.context import CryptContext

@@ -89,14 +89,14 @@ async def update_user_data(
 
     user_roles = [role.name.value for role in current_user.roles]
 
-    if "admin" not in user_roles and current_user.id != user_id:
+    if RoleEnum.Admin.value not in user_roles and current_user.id != user_id:
         logger.warning(
             "Пользователь '%s' (ID: %d) попытался обновить данные другого пользователя (ID: %d) без прав администратора.",
             current_user.login, current_user.id, user_id)
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
                             detail="Недостаточно прав для редактирования этого пользователя")
 
-    if "admin" not in user_roles:
+    if RoleEnum.Admin.value not in user_roles:
         if user_update.role_ids is not None:
             logger.warning(
                 "Пользователь '%s' (ID: %d) попытался обновить роли пользователя (ID: %d) без прав администратора.",
@@ -137,7 +137,7 @@ async def get_users_list(db: AsyncSession, current_user: UserModel) -> List[User
     """
     user_roles = [role.name.value for role in current_user.roles]
 
-    if "admin" in user_roles or "moderator" in user_roles:
+    if RoleEnum.Admin.value in user_roles or RoleEnum.Moderator.value in user_roles:
         result = await db.execute(select(UserModel).
                                   options(joinedload(UserModel.roles)))
         logger.info("Список пользователей успешно получен")
@@ -163,7 +163,7 @@ async def get_user_by_id_service(user_id: int, db: AsyncSession, current_user: U
         logger.warning("Запрос пользователя с Id %d не дал результатов.", user_id)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Пользователь не найден")
 
-    if "admin" in user_roles or "moderator" in user_roles or current_user.id == user_id:
+    if RoleEnum.Admin.value in user_roles or RoleEnum.Moderator.value in user_roles or current_user.id == user_id:
         logger.info("Пользователь с Id %d успешно получен.", user_id)
         return user
     else:
