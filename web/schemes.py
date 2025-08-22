@@ -16,17 +16,22 @@ class UserBase(BaseModel):
     phone: Optional[str] = None
     email: Optional[EmailStr] = None
     in_ban: bool = False
+    created: datetime
 
     class Config:
         from_attributes = True
 
-class UserCreate(UserBase):
-    password: str
-
 class User(UserBase):
     id: int
-    created: datetime
     roles: Annotated[list[Role], Field(default_factory=list)] = None
+
+class UserCreate(BaseModel):
+    login: str
+    password: str
+    FIO: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[EmailStr] = None
+    in_ban: bool = False
 
 class UserForNews(BaseModel):
     login: str

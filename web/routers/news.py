@@ -1,7 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from web.model_news import User as UserModel, TagEnum, RoleEnum, NewsStatusEnum
 from web.database import get_db
-from web.schemes import News, NewsCreate, NewsUpdate, NewsWithPermission
+from web.schemes import News, NewsCreate, NewsUpdate, NewsWithPermission, User
 from web.Guard import get_current_user, role_required
 from fastapi import APIRouter, Depends, status
 from typing import List, Optional, Annotated
@@ -47,7 +47,7 @@ async def get_published_news(
 @router.get("/", response_model=list[News])
 async def get_all_news_authorized(
         db: AsyncSession = Depends(get_db),
-        current_user: Optional[UserModel] = Depends(get_current_user)
+        current_user: Optional[User] = Depends(get_current_user)
 ):
     """
     Получить все доступные новости авторизованному пользователю.
@@ -62,28 +62,31 @@ async def get_all_news_authorized(
 async def get_news_by_id(
     news_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: Optional[UserModel] = Depends(get_current_user)
+    current_user: Optional[User] = Depends(get_current_user)
 ):
     logger.info("Пользователь '%s' запрашивает новость с ID: %d",
                 current_user.login if current_user else "Неавторизованный пользователь", news_id)
     news_data = await get_news_by_id_service(news_id, db, current_user)
 
-    current_user_data = news_data.pop("current_user", None)
-    user_roles = current_user_data["roles"] if current_user_data else []
+    can_publish_value = False
+    can_delete_update_value = False
 
-    is_moderator = RoleEnum.Moderator.value in user_roles
-    is_admin = RoleEnum.Admin.value in user_roles
-    is_author = bool(current_user_data) and news_data["created_by_user_id"] == current_user_data["id"]
+    user_roles = [role.name for role in current_user.roles] if current_user else []
 
-    can_publish_value = is_moderator and news_data["status"] == NewsStatusEnum.Draft
-    can_delete_update_value = is_moderator or is_admin or is_author
+    if bool(current_user):
+        is_moderator = RoleEnum.Moderator in user_roles
+        is_admin = RoleEnum.Admin in user_roles
+        is_author = bool(current_user) and news_data.created_by_user_id == current_user.id
 
-    return NewsWithPermission.model_validate({
-        **news_data,
-        "can_publish": can_publish_value,
-        "can_delete_update": can_delete_update_value
-    })
+        can_publish_value = is_moderator and news_data.status == NewsStatusEnum.Draft
+        can_delete_update_value = is_moderator or is_admin or is_author
+        logger.info("дополнительные пороверки закончены")
 
+    response_data = news_data.model_dump()
+    response_data["can_publish"] = can_publish_value
+    response_data["can_delete_update"] = can_delete_update_value
+
+    return NewsWithPermission.model_validate(response_data)
 
 @router.patch("/{news_id}", response_model=News)
 async def update_news(
@@ -99,16 +102,14 @@ async def update_news(
     logger.info("метод по обновлению новости начнется")
     updated_news = await update_news_service(news_id=news_id, news_data=news_data, db=db, current_user=current_user)
     logger.info("метод по обновлению новости завершен")
-    # updated_news = await get_news_by_id(news_id=news_id, db=db, current_user=current_user)
-    # logger.info("возвращение данных завершено")
-    return News.model_validate(updated_news)
+    return updated_news
 
 
 @router.patch("/publish/{news_id}", response_model=News)
 async def publish_news(
     news_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: Annotated[UserModel, Depends(get_current_user)] = None
+    current_user: Annotated[User, Depends(get_current_user)] = None
 ):
     """
     Опубликовать новость. Только для модераторов и администраторов.

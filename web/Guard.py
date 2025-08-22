@@ -7,8 +7,8 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload
 from fastapi.security import OAuth2PasswordBearer
 from web.database import get_db
-from web.model_news import User, RoleEnum
-from web.schemes import TokenData
+from web.model_news import User
+from web.schemes import TokenData, User as UserPydantic
 import os, logging
 from passlib.context import CryptContext
 
@@ -43,7 +43,7 @@ def decode_access_token(token: str) -> Optional[dict]:
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token", auto_error=False)
 
-async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)) -> Optional[User]:
+async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)) -> Optional[UserPydantic]:
     if not token:
         logger.warning("Отсутствует токен.")
         return None
@@ -64,7 +64,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession
     user = user_result.scalars().unique().one_or_none()
     if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Пользователь не найден")
-    return user
+    return UserPydantic.model_validate(user)
 
 def role_required(required_roles: List[str]):
     async def role_checker(current_user: User = Depends(get_current_user), token: str = Depends(oauth2_scheme)):

@@ -120,16 +120,9 @@ async def update_user_data(
 
     db.add(user_to_update)
     await db.commit()
-    #И ТУТ ТОЖЕ АААААА
-    result = await db.execute(
-        select(UserModel)
-        .options(selectinload(UserModel.roles))
-        .where(UserModel.id.is_(user_id))
-    )
-    updated_user_with_relations = result.unique().scalars().one_or_none()
-
+    await db.refresh(user_to_update)
     logger.info("Данные пользователя с ID %d успешно обновлены.", user_id)
-    return updated_user_with_relations
+    return user_to_update
 
 async def get_users_list(db: AsyncSession, current_user: UserModel) -> List[UserModel]:
     """
@@ -139,7 +132,7 @@ async def get_users_list(db: AsyncSession, current_user: UserModel) -> List[User
 
     if RoleEnum.Admin.value in user_roles or RoleEnum.Moderator.value in user_roles:
         result = await db.execute(select(UserModel).
-                                  options(joinedload(UserModel.roles)))
+                                  options(selectinload(UserModel.roles)))
         logger.info("Список пользователей успешно получен")
         return list(result.scalars().unique().all())
     else:
