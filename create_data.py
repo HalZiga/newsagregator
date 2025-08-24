@@ -3,11 +3,12 @@ from typing import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from web.database import engine, get_db
-from web.model_news import WebNews as News, User, Role, RoleEnum
-from web.schemes import NewsStatusEnum
-from web.database import Base
+
+from web.database import Base, engine, get_db
 from web.Guard import hash_password  # Импортируем функцию из Guard.py
+from web.model_news import Role, RoleEnum, User
+from web.model_news import WebNews as News
+from web.schemes import NewsStatusEnum
 
 
 async def create_users_and_news(session: AsyncSession):
@@ -16,7 +17,10 @@ async def create_users_and_news(session: AsyncSession):
     и затем создает четыре новости для reader2_user.
     """
     # Сначала проверяем и создаем необходимые роли, если их нет
-    roles = {role_enum: await session.scalar(select(Role).where(Role.name == role_enum)) for role_enum in RoleEnum}
+    roles = {
+        role_enum: await session.scalar(select(Role).where(Role.name == role_enum))
+        for role_enum in RoleEnum
+    }
 
     for role_enum, role_obj in roles.items():
         if not role_obj:

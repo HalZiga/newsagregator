@@ -1,35 +1,45 @@
-from typing import List, Annotated
-from dotenv import load_dotenv
-from contextlib import asynccontextmanager
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.exc import IntegrityError
-from fastapi import FastAPI, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.exceptions import RequestValidationError
-from web.schemes import Role, Token
-from web.database import get_db, Base, engine, SessionLocal
-from web.routers.users import router as user_router
-from web.routers.news import router as news_router
-from web.Guard import create_access_token, verify_password
-from web.services.user_service import get_user_by_login, get_all_roles_service
-from web.services.init_service import initialize_database
-from web.exception_handlers import (
-    integrity_error_handler, http_exception_handler, validation_exception_handler,
-    catch_all_exception_handler
-)
 import logging
+from contextlib import asynccontextmanager
+from typing import Annotated, List
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+from dotenv import load_dotenv
+from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from web.database import Base, SessionLocal, engine, get_db
+from web.exception_handlers import (
+    catch_all_exception_handler,
+    http_exception_handler,
+    integrity_error_handler,
+    validation_exception_handler,
+)
+from web.Guard import create_access_token, verify_password
+from web.routers.news import router as news_router
+from web.routers.users import router as user_router
+from web.schemes import Role, Token
+from web.services.init_service import initialize_database
+from web.services.user_service import get_all_roles_service, get_user_by_login
+
+logging.basicConfig(
+    level=logging.INFO, format=("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+)
+
 logger = logging.getLogger(__name__)
 
 load_dotenv()
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Запуск приложения, БД и начальных данных")
-    async with engine.begin() as conn: # асинхронный контекстный менеджер
-        await conn.run_sync(Base.metadata.create_all) #run_sync запускает в отдельном потоке
+    async with engine.begin() as conn:  # асинхронный контекстный менеджер
+        await conn.run_sync(
+            Base.metadata.create_all
+        )  # run_sync запускает в отдельном потоке
     db = SessionLocal()
     try:
         await initialize_database(db)
@@ -41,6 +51,7 @@ async def lifespan(app: FastAPI):
         await db.close()
     yield
     logger.info("Завершаем приложение")
+
 
 app = FastAPI(lifespan=lifespan)
 
@@ -68,24 +79,27 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 @app.get("/roles/", response_model=List[Role])
 async def get_roles(db: AsyncSession = Depends(get_db)):
     return await get_all_roles_service(db)
 
 
-
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
 
 @app.post("/token", response_model=Token)
 async def login_for_access_token(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     logger.info("Попытка аутентификации для пользователя: %s", form_data.username)
     user = await get_user_by_login(db, form_data.username)
 
     if not user or not verify_password(form_data.password, user.password):
-        logger.warning("Неудачная попытка входа для пользователя: %s", form_data.username)
+        logger.warning(
+            "Неудачная попытка входа для пользователя: %s", form_data.username
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Неправильный логин или пароль",
@@ -99,6 +113,10 @@ async def login_for_access_token(
 
     logger.info("Пользователь '%s' успешно аутентифицирован.", user.login)
     access_token = create_access_token(
-        data={"sub": user.login, "id": user.id, "roles": [role.name.value for role in user.roles]},
+        data={
+            "sub": user.login,
+            "id": user.id,
+            "roles": [role.name.value for role in user.roles],
+        },
     )
     return {"access_token": access_token, "token_type": "bearer"}

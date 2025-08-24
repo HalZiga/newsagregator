@@ -1,9 +1,22 @@
 import enum
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Enum, ForeignKey, Table
-from sqlalchemy.dialects.sqlite import JSON as SQLiteJSON
-from web.database import Base
-from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
+
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Integer,
+    String,
+    Table,
+    Text,
+)
+from sqlalchemy.dialects.sqlite import JSON as SQLiteJSON
+from sqlalchemy.orm import relationship
+
+from web.database import Base
+
 
 class TagEnum(enum.Enum):
     Live = "Live"
@@ -26,25 +39,31 @@ class TagEnum(enum.Enum):
     FOOD = "Food"
     LIFESTYLE = "Lifestyle"
 
+
 class RoleEnum(enum.Enum):
     Admin = "admin"
     Moderator = "moderator"
     Reader = "reader"
     Author = "author"
 
+
 class NewsStatusEnum(enum.Enum):
     Draft = "draft"
     Published = "published"
     Archived = "archived"
 
+
 user_roles = Table(
-    'user_roles', Base.metadata,
-    Column('user_id', Integer, ForeignKey('users.id'), primary_key=True),
-    Column('role_id', Integer, ForeignKey('roles.id'), primary_key=True)
+    "user_roles",
+    Base.metadata,
+    Column("user_id", Integer, ForeignKey("users.id"), primary_key=True),
+    Column("role_id", Integer, ForeignKey("roles.id"), primary_key=True),
 )
-#------------------------- мб Mapped использовать
+
+
+# ------------------------- мб Mapped использовать
 class User(Base):
-    __tablename__ = 'users'
+    __tablename__ = "users"
 
     id = Column(Integer, primary_key=True)
     login = Column(String(50), unique=True, nullable=False)
@@ -57,9 +76,13 @@ class User(Base):
     updated = Column(DateTime)
     ban_at = Column(DateTime)
 
+    roles = relationship(
+        "Role", secondary=user_roles, back_populates="users", lazy="selectin"
+    )
+    created_news_items = relationship(
+        "WebNews", back_populates="created_by", lazy="selectin"
+    )
 
-    roles = relationship("Role", secondary=user_roles, back_populates="users", lazy="selectin")
-    created_news_items = relationship("WebNews", back_populates="created_by", lazy="selectin")
 
 class WebNews(Base):
     __tablename__ = "news"
@@ -68,22 +91,31 @@ class WebNews(Base):
     title = Column(String, nullable=False)
     body = Column(Text, nullable=False)
     URL = Column(String, unique=True)
-    created_by_user_id = Column(Integer, ForeignKey('users.id'))
-    status = Column(Enum(NewsStatusEnum), default=NewsStatusEnum.Draft, nullable=False, index=True)
+    created_by_user_id = Column(Integer, ForeignKey("users.id"))
+    status = Column(
+        Enum(NewsStatusEnum), default=NewsStatusEnum.Draft, nullable=False, index=True
+    )
     created_at = Column(DateTime)
     published_at = Column(DateTime)
     redacted_at = Column(DateTime)
-    tags = Column(SQLiteJSON , default=list, nullable=False)
-    category = Column(Enum(TagEnum), nullable=False, default=TagEnum.Live) #
+    tags = Column(SQLiteJSON, default=list, nullable=False)
+    category = Column(Enum(TagEnum), nullable=False, default=TagEnum.Live)  #
     views = Column(Integer, default=0)
 
-    created_by = relationship("User", foreign_keys=[created_by_user_id], back_populates="created_news_items", lazy="selectin")
+    created_by = relationship(
+        "User",
+        foreign_keys=[created_by_user_id],
+        back_populates="created_news_items",
+        lazy="selectin",
+    )
+
 
 class Role(Base):
-    __tablename__ = 'roles'
+    __tablename__ = "roles"
 
     id = Column(Integer, primary_key=True)
     name = Column(Enum(RoleEnum), nullable=True)
 
-    users = relationship("User", secondary=user_roles, back_populates="roles", lazy="selectin")
-
+    users = relationship(
+        "User", secondary=user_roles, back_populates="roles", lazy="selectin"
+    )

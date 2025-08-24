@@ -1,7 +1,10 @@
-from pydantic import BaseModel, EmailStr, Field
-from typing import Optional, Annotated
 from datetime import datetime
-from web.model_news import RoleEnum, TagEnum, NewsStatusEnum
+from typing import Annotated, Optional
+
+from pydantic import BaseModel, EmailStr, Field
+
+from web.model_news import NewsStatusEnum, RoleEnum, TagEnum
+
 
 class Role(BaseModel):
     id: int
@@ -9,6 +12,7 @@ class Role(BaseModel):
 
     class Config:
         from_attributes = True
+
 
 class UserBase(BaseModel):
     login: str
@@ -21,9 +25,11 @@ class UserBase(BaseModel):
     class Config:
         from_attributes = True
 
+
 class User(UserBase):
     id: int
     roles: Annotated[list[Role], Field(default_factory=list)] = None
+
 
 class UserCreate(BaseModel):
     login: str
@@ -33,6 +39,7 @@ class UserCreate(BaseModel):
     email: Optional[EmailStr] = None
     in_ban: bool = False
 
+
 class UserForNews(BaseModel):
     login: str
     roles: list[Role]
@@ -40,9 +47,11 @@ class UserForNews(BaseModel):
     class Config:
         from_attributes = True
 
+
 class UserLogin(BaseModel):
     login: str
     password: str
+
 
 class UserForModerator(BaseModel):
     id: int
@@ -53,6 +62,7 @@ class UserForModerator(BaseModel):
 
     class Config:
         from_attributes = True
+
 
 class UserUpdate(BaseModel):
     login: Optional[str] = Field(None, min_length=3, max_length=50)
@@ -65,11 +75,13 @@ class UserUpdate(BaseModel):
     class Config:
         from_attributes = True
 
+
 class UserUpdateBanStatus(BaseModel):
     in_ban: Optional[bool] = None
 
     class Config:
         from_attributes = True
+
 
 class Token(BaseModel):
     access_token: str
@@ -81,17 +93,21 @@ class TokenData(BaseModel):
     id: int
     roles: list[str] = []
 
+
 class NewsBase(BaseModel):
     title: str = Field(..., min_length=3, max_length=255)
     body: str = Field(..., min_length=10)
     tags: list[str] = Field(default_factory=list)
     category: Optional[TagEnum] = None
 
+
 class NewsCreate(NewsBase):
     pass
 
+
 class NewsUpdate(NewsBase):
     pass
+
 
 class News(NewsBase):
     id: int
@@ -106,6 +122,7 @@ class News(NewsBase):
 
     class Config:
         from_attributes = True
+
 
 class NewsWithPermission(News):
     can_publish: bool

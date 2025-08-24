@@ -1,16 +1,13 @@
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
+from sqlalchemy import engine_from_config, pool
 
 from alembic import context
 
-# Это ваш импорт для Base.metadata
-from web.database import Base
-from web.model_news import * # Импортируем все модели, чтобы Alembic их видел
-
 # Замените этот блок на импорт вашего асинхронного движка
+# Это ваш импорт для Base.metadata
 from web.database import DATABASE_URL
+from web.model_news import Base  # Импортируем все модели, чтобы Alembic их видел
 
 # Получение объекта config
 config = context.config
@@ -21,6 +18,7 @@ if config.config_file_name is not None:
 
 # Целевая метадата для миграций
 target_metadata = Base.metadata
+
 
 # Прочие значения из alembic.ini
 def run_migrations_offline():
@@ -33,6 +31,7 @@ def run_migrations_offline():
     )
     with context.begin_transaction():
         context.run_migrations()
+
 
 def run_migrations_online():
     """Run migrations in 'online' mode."""
@@ -51,6 +50,7 @@ def run_migrations_online():
         )
         with context.begin_transaction():
             context.run_migrations()
+
 
 if context.is_offline_mode():
     run_migrations_offline()

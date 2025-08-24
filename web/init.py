@@ -1,14 +1,15 @@
-from web.database import SessionLocal
-from web.model_news import Role, RoleEnum
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+
+from web.database import SessionLocal
+from web.model_news import Role, RoleEnum
+
 
 def create_initial_roles():
     session: Session = SessionLocal()
     try:
         for role_name in RoleEnum:
-
-            existing_role = session.query(Role).filter_by(name = role_name).first()
+            existing_role = session.query(Role).filter_by(name=role_name).first()
             if not existing_role:
                 new_role = Role(role_name)
                 session.add(new_role)
@@ -25,7 +26,8 @@ def create_initial_roles():
         session.rollback()
         print(f"Произошла ошибка: {e}. Откатываем изменения.")
     finally:
-        session.close() # Всегда закрываем сессию
+        session.close()  # Всегда закрываем сессию
+
 
 # create_initial_roles()
 
